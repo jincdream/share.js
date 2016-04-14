@@ -1,0 +1,298 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+</head>
+<body>
+<style>
+  a{
+    font-size: 10em;
+  }
+</style>
+  <a href="javascript:;" id="weibo">微博</a><hr/>
+  <a href="javascript:;" id="qzone">空间</a><hr/>
+  <a href="javascript:;" id="wx">微信好友</a><hr/>
+  <a href="javascript:;" id="pyq">朋友圈</a><hr/>
+  <a href="javascript:;" id="weibo_app">微博APP</a><hr/>
+  <a href="javascript:;" id="qzone_app">空间APP</a><hr/>
+  <script>
+  </script>
+  <script>
+    var Share = function(option){
+      var platform = option.platform || "iPhone"
+      var browser  = option.browser || "uc"
+      var _self = this
+      _self._brVersion = option.brVersion
+      _self._init(platform,browser)
+    }
+    /**
+    @dec init share type
+    @platform iPhone|Android
+    @browser uc|qq
+    */
+    Share.prototype._init = function(platform,browser){
+      var _self = this
+      var _v
+      _self.appKeys = (_v = _self._appKeys[browser][platform]) ? _v : _self._appKeys[browser]
+      _self._runMeth = '_'+browser+'Share'
+    }
+    Share.prototype._appKeys = {
+      safari:{},
+      uc :  {
+       iPhone:{
+          sinaWeibo : "kSinaWeibo",
+          weixin : "kWeixin",
+          weixinFriend : "kWeixinFriend",
+          QQ : "kQQ",
+          QZone : "kQZone"
+        },
+        Android:{
+          sinaWeibo : "SinaWeibo",
+          weixin : "WechatFriends",
+          weixinFriend : "WechatTimeline",
+          QQ : "QQ",
+          QZone : "QZone"
+        }
+      },
+      qq : {
+        sinaWeibo:11,
+        weixin:1,
+        weixinFriend:8,
+        QQ:4,
+        QZone:3
+      }
+    }
+    Share.prototype._createUcDate = function(key,data){
+      return [data.title || '', data.text || '', data.shareUrl || '', key, "", data.from || '', ""]
+    }
+    Share.prototype._createQQDate = function(key,data){
+      return {
+        url: data.shareUrl || '',
+        title: data.title || '',
+        description: data.text || '',
+        img_url: data.shareImg || '',
+        img_title: data.shareImgTitle || '',
+        to_app: key,//微信好友1,腾讯微博2,QQ空间3,QQ好友4,生成二维码7,微信朋友圈8,啾啾分享9,复制网址10,分享到微博11,创意分享13
+        cus_txt: "请输入此时此刻想要分享的内容"
+      }
+    }
+    Share.prototype._ucShare = function(appName,data){
+      var _self = this
+      var key = _self.appKeys[appName]
+      var data = _self._createUcDate(key,data)
+      if (appName == 'QZone') {
+          var B = "mqqapi://share/to_qzone?src_type=web&version=1&file_type=news&req_type=1&image_url="+data.showImg+"&title="+data.title+"&description="+data.text+"&url="+data.shareUrl+"&app_name="+data.from;
+          var k = document.createElement("div")
+          k.style.visibility = "hidden"
+          k.innerHTML = '<iframe src="' + B + '" scrolling="no" width="1" height="1"></iframe>'
+          document.body.appendChild(k)
+          window.setTimeout(function () {
+            k && k.parentNode && k.parentNode.removeChild(k)
+          }, 5E3);
+      }
+      var _uc = window.ucweb || window.ucbrowser
+      if(!_uc)return;
+      _uc.startRequest && _uc.startRequest("shell.page_share",data)
+      _uc.web_share && _uc.web_share.apply(_uc,data)
+    }
+    Share.prototype._qqShare = function(appName,data){
+      var _self = this
+      var key = _self.appKeys[appName]
+      var data = _self._createQQDate(key,data || {})
+      /**
+        lower: "http://3gimg.qq.com/html5/js/qb.js",
+        higher: "http://jsapi.qq.com/get?api=app.share"
+      */
+      if(_self.__QQ_API_LOADING)return;
+      if(_self.__QQ_API_LOADED){
+        _self._brVersion < 5.4 ? window.qb.share(data) : window.browser.app.share(data)
+        return;
+      }
+      _self.__QQ_API_LOADING = !0
+      var _loadUrl = _self._brVersion < 5.4 ? 'http://3gimg.qq.com/html5/js/qb.js' : 'http://jsapi.qq.com/get?api=app.share'
+      var d = document.createElement("script");
+      var a = document.getElementsByTagName("body")[0];
+      d.onload = function(){
+        _self.__QQ_API_LOADED = !0
+        _self.__QQ_API_LOADING = !1
+        _self._brVersion < 5.4 ? window.qb.share(data) : window.browser.app.share(data)
+      }
+      d.setAttribute("src", _loadUrl)
+      a.appendChild(d)
+      
+      // alert(window.browser)
+    }
+    Share.prototype._createWebUrl =function(data){
+      var api = "http://service.weibo.com/share/mobile.php?"
+              + "appkey=" + (data.sinaAppKey || 3549659419)
+              + "&title=" + (data.text || '')
+              + "&url=" + encodeURIComponent(data.shareUrl)
+              + "&ralateUid=" + (data.sinaUid || 2298836177)
+              + "&pic=" + encodeURIComponent(data.shareImg || '')
+              console.log(api)
+      return api
+    }
+    Share.prototype._createQZoneUrl = function(data){
+      var api = "http://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?"
+              + "url=" + encodeURIComponent(data.shareUrl)
+              + "&showcount=1"
+              + "&desc=" + (data.text || '')
+              + "&summary=" + (data.text || '')
+              + "&title=" + (data.title || '')
+              + "&pics=" + (data.shareImg || '')
+              + "&otype=share"
+      return api
+    }
+    Share.prototype._webShare = function(appName,data){
+      var openUrl = appName === 'sinaWeibo' ? this._createWebUrl(data) : this._createQZoneUrl(data)
+      window.open(openUrl, "_blank", "width\x3d615,height\x3d505") || (location.href = openUrl)
+    }
+    Share.prototype.toWeibo = function(data,isApp){
+      var _self = this
+      isApp ? _self[_self._runMeth]('sinaWeibo',data) : _self._webShare('sinaWeibo',data)
+    }
+    Share.prototype.toWeiXin = function(data,isApp){
+      var _self = this
+      var _runFn = _self[_self._runMeth]
+      _runFn && _runFn.call(_self,'weixin',data)
+    }
+    Share.prototype.toWeiXinF = function(data,isApp){
+      var _self = this
+      var _runFn = _self[_self._runMeth]
+      _runFn && _runFn.call(_self,'weixinFriend',data)
+    }
+    Share.prototype.toQzone = function(data,isApp){
+      var _self = this
+      isApp ? _self[_self._runMeth]('QZone',data) : _self._webShare('QZone',data)
+    }
+    var oaInfo = (function(ua){
+      var match
+      var browser = {}
+      var device = {}
+      var rz = {
+        browser:browser,
+        device:device
+      }
+      if(match = ua.match(/(iPod|iPad|iPhone)/i)) {
+        device.type = 'iPhone';
+        device.model = match[1];
+        if(!~ua.indexOf('CriOS') && !~ua.indexOf('MQQBrowser') && !ua.indexOf('Mozilla') && /Safari\/[\d\.]+$/.test(ua)) {
+          browser.name = 'safari'
+          return rz;
+        }
+      }else{
+        device.type = 'Android'
+      }
+      if(match = /UCBrowser\/([\w.]+)/i.exec(ua)) {
+        browser.name = 'uc'
+        browser.version = match[1]
+        return rz;
+      }
+      if(match = ua.match(/MQQBrowser/i)){
+        browser.name = "qq"
+        browser.version = +ua.match(/Version\/([\d\.]*?)\s/i)[1]
+        return rz;
+      }
+      return rz;
+    })(window.navigator.userAgent)
+    console.log(oaInfo.browser.name + ' :: ' + oaInfo.browser.version + ' -- '+oaInfo.device.type)
+  </script>
+  <script>
+    var data  = {
+
+    }
+    var share = new Share({
+      platform:oaInfo.device.type,
+      browser:oaInfo.browser.name,
+      version:oaInfo.browser.version
+    })
+    // var share = new Share({
+    //   platform:oaInfo.device.type,
+    //   browser:'qq',
+    //   version:6
+    // })
+    function bodyScroll(e){
+        evt = e || window.event;
+        evt.preventDefault() ?  evt.preventDefault() : evt.returnValue = false;
+    }
+    function shareWeixinGuide(){
+        document.addEventListener("touchmove",bodyScroll,false);
+        var guideMod = document.getElementById("JsafariGuide");
+        if(guideMod){
+            guideMod.style.display = "block";
+            var shareBox = document.getElementById("JshareBox");
+            if(shareBox && shareBox.style.display == "block"){
+                shareBox.style.display = "none";
+            }
+            return;
+        }
+        var img = new Image,        
+            h = document.documentElement.clientHeight,
+            elem = document.createElement("div"),
+            cssStyle='display:block;width:100%;height:100%;background:rgba(0,0,0,.7);position:fixed;top:0;left:0;z-index:999;text-align:center;',
+            body = document.getElementsByTagName("body")[0],
+            shareBox = document.getElementById("JshareBox");
+            console.log(cssStyle)
+        img.src='http://www1.pcauto.com.cn/wap/gz20160222/art/images/set.png',
+        elem.id = "JsafariGuide";
+        elem.style.cssText = cssStyle;
+        shareBox.style.display = "none";
+        elem.innerHTML = '<div onclick="closeSafariGuide();" id="JguidePic" style="text-align:center;width:100%;height:100%;vertical-align:middle;"><img alt="" src="http://www1.pcauto.com.cn/wap/2013/touch/img/loading.gif" style="max-height:100%;max-width:100%;display:inline-block;position:relative;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%);" /></div>';
+        body.appendChild(elem);
+        img.onload = function(){
+            document.querySelectorAll("#JguidePic img")[0].src = 'http://www1.pcauto.com.cn/wap/gz20160222/art/images/set.png';
+        }
+    }
+
+    function closeSafariGuide(){
+        document.removeEventListener("touchmove",bodyScroll,false);
+        var guideMod = document.getElementById("JsafariGuide");
+        guideMod.style.display = "none";
+    }
+    document.getElementById('weibo').onclick = function(){
+      share.toWeibo({
+        text: 'ssssss',
+        shareUrl: 'http://www.pconline.com.cn?adasd=213123'
+      })
+    }
+    document.getElementById('weibo_app').onclick = function(){
+      share.toWeibo({
+        text: 'ssssss',
+        shareUrl: 'http://www.pconline.com.cn?adasd=213123'
+      },!0)
+    }
+    document.getElementById('qzone_app').onclick = function(){
+      share.toQzone({
+        text: 'ssssss',
+        shareUrl: 'http://www.pconline.com.cn?adasd=213123'
+      },!0)
+    }
+    document.getElementById('wx').onclick = function(){
+      // if(oaInfo.browser.name === 'safari'){
+      //   return shareWeixinGuide()
+      // }
+      share.toWeiXin({
+        title: 'wsxx',
+        text: 'ssdad',
+        shareUrl: 'http://www.pconline.com.cn?asds=11'
+      })
+    }
+    document.getElementById('pyq').onclick = function(){
+      share.toWeiXinF({
+        title: 'wsxx',
+        text: 'ssdad',
+        shareUrl: 'http://www.pconline.com.cn?asds=11'
+      })
+    }
+    document.getElementById('qzone').onclick = function(){
+      share.toQzone({
+        text: 'ssdad',
+        shareUrl: 'http://www.pconline.com.cn?asds=11'
+      })
+    }
+    
+  </script>
+<script type="text/javascript" charset="utf-8" src="http://192.168.16.193:8132/livereload.js"></script></body>
+</html>
